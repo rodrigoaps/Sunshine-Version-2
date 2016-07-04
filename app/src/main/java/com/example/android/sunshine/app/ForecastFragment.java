@@ -1,6 +1,10 @@
 package com.example.android.sunshine.app;
 
+import android.content.Context;
+import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.preference.PreferenceManager;
 import android.support.v4.app.Fragment;
 import android.text.format.Time;
 import android.view.LayoutInflater;
@@ -10,10 +14,12 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
 import android.widget.ListView;
 import android.widget.ArrayAdapter;
 import android.os.AsyncTask;
 import android.net.Uri;
+import android.widget.Toast;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -54,6 +60,14 @@ public class ForecastFragment extends Fragment {
     }
 
     @Override
+    public void onStart(){
+        super.onStart();
+        updateWeather();
+    }
+
+
+
+    @Override
     public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
         // Inflate the menu; this adds items to the action bar if it is present.
         inflater.inflate(R.menu.forecastfragment, menu);
@@ -65,10 +79,15 @@ public class ForecastFragment extends Fragment {
         // as you specify a parent activity in AndroidManifest.xml.
         int id = item.getItemId();
 
+
         //noinspection SimplifiableIfStatement
         if (id == R.id.action_refresh) {
-            FetchWeatherTask refreshTask = new FetchWeatherTask();
-            refreshTask.execute("94043");
+
+            updateWeather();
+        }
+
+        if (id == R.id.action_settings) {
+            startActivityForResult(new Intent(getActivity(), SettingsActivity.class), 0);
             return true;
         }
         return super.onOptionsItemSelected(item);
@@ -77,16 +96,7 @@ public class ForecastFragment extends Fragment {
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
-        String[] forecast_list = {
-                "Today - 05/06 - 16/20ºC",
-                "Tomorrow - 06/06 - 17/22ºC",
-                "Tuesday - 07/06 - 12/20ºC",
-                "Wednsday - 08/06 - 13/19ºC",
-                "Thursday - 09/06 - 20/27ºC",
-                "Friday - 10/06 - 22/28ºC",
-                "Saturday - 11/06 - 20/25ºC",
-                "Sunday - 12/06 - 16/23ºC",
-        };
+        String[] forecast_list = {};
 
         List<String> weekForecast = new ArrayList<String>(Arrays.asList(forecast_list));
 
@@ -99,7 +109,32 @@ public class ForecastFragment extends Fragment {
         ListView listView = (ListView) rootView.findViewById(R.id.listview_forecast);
         listView.setAdapter(listAdapter);
 
+        listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+
+                Context context = getActivity();
+                String text = String.valueOf(parent.getItemAtPosition(position));
+
+                Intent detailIntent = new Intent(context, DetailActivity.class);
+                detailIntent.setData(Uri.parse(text));
+                startActivity(detailIntent);
+
+            }
+        });
+
         return rootView;
+    }
+
+    private void updateWeather(){
+
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getActivity());
+        String location = prefs.getString(this.getString(R.string.pref_location_key), this.getString(R.string.pref_location_default));
+        String temp = prefs.getString(this.getString(R.string.pref_temperature_key), this.getString(R.string.pref_temperature_default));
+        String[] query = {location, temp};
+
+        FetchWeatherTask refreshTask = new FetchWeatherTask();
+        refreshTask.execute(query);
     }
 
 
@@ -226,7 +261,6 @@ public class ForecastFragment extends Fragment {
             String forecastJsonStr = null;
 
             String format = "json";
-            String units = "metric";
             int numDays = 7;
             String OPEN_WEATHER_MAP_API_KEY = "2e44df453d316d07136905691c1d0b7e";
 
@@ -244,7 +278,7 @@ public class ForecastFragment extends Fragment {
                 Uri builtUri = Uri.parse(FORECAST_BASE_URL).buildUpon()
                         .appendQueryParameter(QUERY_PARAM, params[0])
                         .appendQueryParameter(FORMAT_PARAM, format)
-                        .appendQueryParameter(UNITS_PARAM, units)
+                        .appendQueryParameter(UNITS_PARAM, params[1])
                         .appendQueryParameter(DAYS_PARAM, Integer.toString(numDays))
                         .appendQueryParameter(APPID_PARAM, OPEN_WEATHER_MAP_API_KEY)
                         .build();
